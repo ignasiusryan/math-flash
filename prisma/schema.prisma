@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String      @id @default(cuid())
+  clerkId       String      @unique
+  name          String?
+  email         String?     @unique
+  role          Role        @default(CHILD)
+  parentId      String?
+  parent        User?       @relation("ParentChildren", fields: [parentId], references: [id])
+  children      User[]      @relation("ParentChildren")
+  factStates    FactState[]
+  attempts      Attempt[]
+  streakCurrent Int         @default(0)
+  streakBest    Int         @default(0)
+  totalStars    Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+enum Role {
+  PARENT
+  CHILD
+}
+
+model FactState {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  factKey      String
+  bucket       Int       @default(0)
+  correctCount Int       @default(0)
+  wrongCount   Int       @default(0)
+  lastSeen     DateTime?
+  nextReview   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, factKey])
+  @@index([userId, nextReview])
+}
+
+model Attempt {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  factKey    String
+  presented  String
+  answer     Int
+  correct    Boolean
+  responseMs Int
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, factKey])
+}
