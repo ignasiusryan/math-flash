@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { getFactKey } from "@/lib/facts";
 
 interface FactData {
@@ -51,8 +52,8 @@ export default function ProgressGrid({ factStates }: ProgressGridProps) {
 
         {/* Grid rows */}
         {Array.from({ length: 10 }, (_, row) => (
-          <>
-            <div key={`r-${row}`} className="text-primary flex items-center justify-center">
+          <Fragment key={`row-${row}`}>
+            <div className="text-primary flex items-center justify-center">
               {row + 1}
             </div>
             {Array.from({ length: 10 }, (_, col) => {
@@ -68,7 +69,7 @@ export default function ProgressGrid({ factStates }: ProgressGridProps) {
                 </div>
               );
             })}
-          </>
+          </Fragment>
         ))}
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ChildSelector from "@/components/ChildSelector";
+import TablePicker from "@/components/TablePicker";
 import GameScreen from "@/components/GameScreen";
 
 interface Child {
@@ -12,6 +13,7 @@ interface Child {
 export default function PlayPage() {
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+  const [selectedTable, setSelectedTable] = useState<number | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   const fetchChildren = async () => {
@@ -37,9 +39,22 @@ export default function PlayPage() {
     }
   };
 
-  const handleSelect = (childId: string) => {
+  const handleSelectChild = (childId: string) => {
     const child = children.find((c) => c.id === childId);
     if (child) setSelectedChild(child);
+  };
+
+  const handleSelectTable = (table: number | null) => {
+    setSelectedTable(table);
+  };
+
+  const handleBackToChildren = () => {
+    setSelectedChild(null);
+    setSelectedTable(undefined);
+  };
+
+  const handleBackToTables = () => {
+    setSelectedTable(undefined);
   };
 
   if (loading) {
@@ -50,20 +65,34 @@ export default function PlayPage() {
     );
   }
 
-  if (selectedChild) {
+  // Step 3: Game
+  if (selectedChild && selectedTable !== undefined) {
     return (
       <GameScreen
         childId={selectedChild.id}
         childName={selectedChild.name}
-        onBack={() => setSelectedChild(null)}
+        table={selectedTable}
+        onBack={handleBackToTables}
       />
     );
   }
 
+  // Step 2: Table picker
+  if (selectedChild) {
+    return (
+      <TablePicker
+        childName={selectedChild.name}
+        onSelect={handleSelectTable}
+        onBack={handleBackToChildren}
+      />
+    );
+  }
+
+  // Step 1: Child selector
   return (
     <ChildSelector
       children={children}
-      onSelect={handleSelect}
+      onSelect={handleSelectChild}
       onAddChild={handleAddChild}
     />
   );

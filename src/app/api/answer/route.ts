@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseFactKey } from "@/lib/facts";
-import { getNextBucket, getNextReviewDate } from "@/lib/spaced-repetition";
+import { getNextBucket, getNextReviewDate, wasTooSlow } from "@/lib/spaced-repetition";
 
 export async function POST(req: NextRequest) {
   const user = await getOrCreateUser();
@@ -32,8 +32,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Fact not found" }, { status: 404 });
   }
 
-  const newBucket = getNextBucket(factState.bucket, correct);
+  const newBucket = getNextBucket(factState.bucket, correct, responseMs);
   const nextReview = getNextReviewDate(newBucket);
+  const tooSlow = correct && wasTooSlow(factState.bucket, responseMs || 0);
 
   // Update fact state
   await prisma.factState.update({
@@ -80,5 +81,6 @@ export async function POST(req: NextRequest) {
     starsEarned: starsEarned + bonusStars,
     totalStars: child.totalStars + starsEarned + bonusStars,
     isMilestone: [10, 25, 50].includes(newStreak),
+    tooSlow,
   });
 }

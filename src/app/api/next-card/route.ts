@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Optional: filter by specific table (e.g., table=7 means only facts involving 7)
+  const table = req.nextUrl.searchParams.get("table");
+
   // Get eligible cards (nextReview <= now)
   const now = new Date();
   const eligible = await prisma.factState.findMany({
@@ -38,22 +41,35 @@ export async function GET(req: NextRequest) {
     orderBy: [{ bucket: "asc" }, { lastSeen: "asc" }],
   });
 
+  // Filter by table if specified
+  const filterByTable = (facts: typeof eligible) => {
+    if (!table) return facts;
+    const t = Number(table);
+    return facts.filter((f) => {
+      const [a, b] = f.factKey.split("x").map(Number);
+      return a === t || b === t;
+    });
+  };
+
   const recentlyShown = req.nextUrl.searchParams.get("recent")?.split(",") || [];
 
+  const filteredEligible = filterByTable(eligible);
+
   let selected;
-  if (eligible.length > 0) {
+  if (filteredEligible.length > 0) {
     selected = selectCard(
-      eligible.map((e) => ({ factKey: e.factKey, bucket: e.bucket, lastSeen: e.lastSeen })),
+      filteredEligible.map((e) => ({ factKey: e.factKey, bucket: e.bucket, lastSeen: e.lastSeen })),
       recentlyShown
     );
   } else {
     // All mastered recently - pick the one coming up soonest
-    const next = await prisma.factState.findFirst({
+    const allFacts = await prisma.factState.findMany({
       where: { userId: childId },
       orderBy: { nextReview: "asc" },
     });
-    if (next) {
-      selected = { factKey: next.factKey, bucket: next.bucket, lastSeen: next.lastSeen };
+    const filtered = filterByTable(allFacts);
+    if (filtered.length > 0) {
+      selected = { factKey: filtered[0].factKey, bucket: filtered[0].bucket, lastSeen: filtered[0].lastSeen };
     }
   }
 

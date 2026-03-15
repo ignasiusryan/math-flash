@@ -6,7 +6,8 @@ interface FlashCardProps {
   first: number;
   second: number;
   answer: string;
-  result?: { correct: boolean; correctAnswer: number } | null;
+  result?: { correct: boolean; correctAnswer: number; tooSlow?: boolean } | null;
+  correctionMode?: boolean;
 }
 
 const cardColors = [
@@ -18,7 +19,7 @@ const cardColors = [
   "from-teal-400 to-teal-500",
 ];
 
-export default function FlashCard({ first, second, answer, result }: FlashCardProps) {
+export default function FlashCard({ first, second, answer, result, correctionMode }: FlashCardProps) {
   const colorIndex = (first + second) % cardColors.length;
   const bgColor = cardColors[colorIndex];
 
@@ -34,30 +35,55 @@ export default function FlashCard({ first, second, answer, result }: FlashCardPr
         }`}
       >
         <div className="text-center text-white">
-          <p className="text-lg font-medium opacity-80 mb-2">What is...</p>
-          <div className="text-6xl font-bold mb-4">
-            {first} × {second}
-          </div>
-          <div className="text-5xl font-bold min-h-[60px]">
-            {result ? (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className={result.correct ? "" : "text-red-200"}
-              >
-                {result.correct ? (
-                  <span>= {result.correctAnswer}</span>
+          {correctionMode ? (
+            <>
+              <p className="text-lg font-medium opacity-80 mb-2">Type the correct answer!</p>
+              <div className="text-6xl font-bold mb-4">
+                {first} × {second}
+              </div>
+              <div className="text-5xl font-bold min-h-[60px]">
+                = {answer || "?"}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-medium opacity-80 mb-2">What is...</p>
+              <div className="text-6xl font-bold mb-4">
+                {first} × {second}
+              </div>
+              <div className="text-5xl font-bold min-h-[60px]">
+                {result ? (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className={result.correct ? "" : "text-red-200"}
+                  >
+                    {result.correct ? (
+                      <div>
+                        <span>= {result.correctAnswer}</span>
+                        {result.tooSlow && (
+                          <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-base mt-2 text-yellow-200 font-medium"
+                          >
+                            Correct! Try to be faster next time
+                          </motion.p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="line-through opacity-60">{answer}</span>
+                        <span className="ml-3">= {result.correctAnswer}</span>
+                      </div>
+                    )}
+                  </motion.div>
                 ) : (
-                  <div>
-                    <span className="line-through opacity-60">{answer}</span>
-                    <span className="ml-3">= {result.correctAnswer}</span>
-                  </div>
+                  <span>= {answer || "?"}</span>
                 )}
-              </motion.div>
-            ) : (
-              <span>= {answer || "?"}</span>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
     </AnimatePresence>

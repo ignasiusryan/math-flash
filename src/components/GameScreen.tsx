@@ -11,6 +11,7 @@ import { playCorrectSound, playWrongSound, playMilestoneSound } from "@/lib/soun
 interface GameScreenProps {
   childId: string;
   childName: string;
+  table?: number | null;
   onBack: () => void;
 }
 
@@ -27,9 +28,10 @@ interface AnswerResult {
   starsEarned: number;
   totalStars: number;
   isMilestone: boolean;
+  tooSlow: boolean;
 }
 
-export default function GameScreen({ childId, childName, onBack }: GameScreenProps) {
+export default function GameScreen({ childId, childName, table, onBack }: GameScreenProps) {
   const [card, setCard] = useState<CardData | null>(null);
   const [answer, setAnswer] = useState("");
   const [result, setResult] = useState<AnswerResult | null>(null);
@@ -39,13 +41,17 @@ export default function GameScreen({ childId, childName, onBack }: GameScreenPro
   const [loading, setLoading] = useState(true);
   const [cardsPlayed, setCardsPlayed] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
+  const [correctionMode, setCorrectionMode] = useState(false);
+  const [correctionAnswer, setCorrectionAnswer] = useState("");
   const recentRef = useRef<string[]>([]);
   const startTimeRef = useRef<number>(0);
 
   const fetchNextCard = useCallback(async () => {
     setLoading(true);
     const recentParam = recentRef.current.slice(-5).join(",");
-    const res = await fetch(`/api/next-card?childId=${childId}&recent=${recentParam}`);
+    let url = `/api/next-card?childId=${childId}&recent=${recentParam}`;
+    if (table) url += `&table=${table}`;
+    const res = await fetch(url);
     const data = await res.json();
 
     if (data.done) {
@@ -57,9 +63,17 @@ export default function GameScreen({ childId, childName, onBack }: GameScreenPro
     }
     setLoading(false);
     startTimeRef.current = Date.now();
-  }, [childId]);
+  }, [childId, table]);
 
   useEffect(() => {
+    fetchNextCard();
+  }, [fetchNextCard]);
+
+  const advanceToNext = useCallback(() => {
+    setResult(null);
+    setAnswer("");
+    setCorrectionMode(false);
+    setCorrectionAnswer("");
     fetchNextCard();
   }, [fetchNextCard]);
 
@@ -100,20 +114,43 @@ export default function GameScreen({ childId, childName, onBack }: GameScreenPro
     setShowReward(true);
     setTimeout(() => setShowReward(false), data.correct ? 800 : 1200);
 
-    // Auto-advance after delay
-    setTimeout(
-      () => {
-        setResult(null);
-        setAnswer("");
-        fetchNextCard();
-      },
-      data.correct ? 1200 : 2500
-    );
+    if (data.correct) {
+      // Auto-advance after delay
+      setTimeout(advanceToNext, data.tooSlow ? 2000 : 1200);
+    } else {
+      // Wrong answer: show correct answer briefly, then enter correction mode
+      setTimeout(() => {
+        setCorrectionMode(true);
+      }, 1800);
+    }
+  };
+
+  const handleCorrectionSubmit = () => {
+    if (!result || !correctionMode) return;
+    if (Number(correctionAnswer) === result.correctAnswer) {
+      playCorrectSound();
+      advanceToNext();
+    } else {
+      // Wrong again - shake and clear
+      setCorrectionAnswer("");
+      playWrongSound();
+    }
   };
 
   // Handle keyboard input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (correctionMode) {
+        if (e.key >= "0" && e.key <= "9" && correctionAnswer.length < 3) {
+          setCorrectionAnswer((a) => a + e.key);
+        } else if (e.key === "Backspace") {
+          setCorrectionAnswer((a) => a.slice(0, -1));
+        } else if (e.key === "Enter" && correctionAnswer.length > 0) {
+          handleCorrectionSubmit();
+        }
+        return;
+      }
+
       if (result) return;
       if (e.key >= "0" && e.key <= "9" && answer.length < 3) {
         setAnswer((a) => a + e.key);
@@ -127,7 +164,7 @@ export default function GameScreen({ childId, childName, onBack }: GameScreenPro
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer, result]);
+  }, [answer, result, correctionMode, correctionAnswer]);
 
   if (loading && !card) {
     return (
@@ -187,7 +224,14 @@ export default function GameScreen({ childId, childName, onBack }: GameScreenPro
         <button onClick={onBack} className="text-gray-400 text-lg font-medium">
           ← Back
         </button>
-        <StreakCounter streak={streak} stars={stars} />
+        <div className="flex items-center gap-3">
+          {table && (
+            <span className="bg-purple-100 text-purple-700 text-sm font-bold px-3 py-1 rounded-full">
+              {table}s table
+            </span>
+          )}
+          <StreakCounter streak={streak} stars={stars} />
+        </div>
       </div>
 
       {/* Card count */}
@@ -201,17 +245,18 @@ export default function GameScreen({ childId, childName, onBack }: GameScreenPro
           <FlashCard
             first={card.first}
             second={card.second}
-            answer={answer}
-            result={result ? { correct: result.correct, correctAnswer: result.correctAnswer } : null}
+            answer={correctionMode ? correctionAnswer : answer}
+            result={correctionMode ? null : (result ? { correct: result.correct, correctAnswer: result.correctAnswer, tooSlow: result.tooSlow } : null)}
+            correctionMode={correctionMode}
           />
         )}
 
         {/* Number Pad */}
         <NumberPad
-          value={answer}
-          onChange={setAnswer}
-          onSubmit={handleSubmit}
-          disabled={!!result}
+          value={correctionMode ? correctionAnswer : answer}
+          onChange={correctionMode ? setCorrectionAnswer : setAnswer}
+          onSubmit={correctionMode ? handleCorrectionSubmit : handleSubmit}
+          disabled={!!result && !correctionMode}
         />
       </div>
 
