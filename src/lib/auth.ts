@@ -1,3 +1,4 @@
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "./db";
 
 const DEV_MODE = !process.env.CLERK_SECRET_KEY || process.env.CLERK_SECRET_KEY === "sk_test_placeholder";
@@ -5,7 +6,6 @@ const DEV_CLERK_ID = "dev_user_001";
 
 export async function getOrCreateUser() {
   if (DEV_MODE) {
-    // Dev mode: use a fixed mock user
     let user = await prisma.user.findUnique({ where: { clerkId: DEV_CLERK_ID } });
     if (!user) {
       user = await prisma.user.create({
@@ -20,8 +20,6 @@ export async function getOrCreateUser() {
     return user;
   }
 
-  // Production mode: use Clerk
-  const { auth, currentUser } = await import("@clerk/nextjs/server");
   const { userId: clerkId } = await auth();
   if (!clerkId) return null;
 
